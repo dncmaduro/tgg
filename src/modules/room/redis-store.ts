@@ -1,5 +1,5 @@
 import { AppError } from "@/lib/errors";
-import { getRedis } from "@/lib/redis/client";
+import { getRedis, RedisConfigurationError } from "@/lib/redis/client";
 import type { RoomRecord } from "@/types/domain";
 import type { Mutation, RoomStore } from "@/modules/room/store";
 
@@ -10,7 +10,7 @@ export class RedisRoomStore implements RoomStore {
   private readonly redis = getRedis();
 
   constructor() {
-    if (!this.redis) throw new Error("RedisRoomStore cần REDIS_URL.");
+    if (!this.redis) throw new RedisConfigurationError("REDIS_REQUIRED", "RedisRoomStore cần REDIS_URL.");
   }
 
   async get(code: string): Promise<RoomRecord | null> {
@@ -34,7 +34,13 @@ export class RedisRoomStore implements RoomStore {
         throw new AppError("ROOM_NOT_FOUND", "Không tìm thấy phòng.", 404);
       }
       const current = JSON.parse(raw) as RoomRecord;
-      const next = mutator(current);
+      let next: Mutation<T>;
+      try {
+        next = mutator(current);
+      } catch (error) {
+        await this.redis!.unwatch();
+        throw error;
+      }
       const transaction = this.redis!.multi().set(key, JSON.stringify(next.room), "EX", TTL_SECONDS);
       const result = await transaction.exec();
       if (result) return next.result;

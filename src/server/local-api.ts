@@ -1,9 +1,10 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { z } from "zod";
-import { hasRedisConfig } from "@/lib/redis/client";
+import { checkRedisHealth, hasRedisConfig, isLocalMemoryFallbackAllowed, RedisConfigurationError } from "@/lib/redis/client";
 import { AppError, isAppError } from "@/lib/errors";
 import { getRoomService } from "@/modules/room/service-singleton";
 import { identitySchema } from "@/modules/realtime/protocol";
+import { enforceRateLimit, getIncomingAddress } from "@/lib/rate-limit";
 
 const createSchema = z.object({ gameId: z.string(), identity: identitySchema });
 const gameActionSchema = z.object({ type: z.string().min(1).max(40), payload: z.unknown() });
@@ -21,10 +22,28 @@ export async function handleLocalApi(request: IncomingMessage, response: ServerR
 
   try {
     if (request.method === "GET" && url.pathname === "/api/health") {
-      return send(response, 200, { ok: true, storage: hasRedisConfig() ? "redis" : "memory", productionReady: hasRedisConfig(), realtime: "websocket" });
+      if (!hasRedisConfig()) {
+        const memoryAllowed = isLocalMemoryFallbackAllowed();
+        return send(response, memoryAllowed ? 200 : 503, {
+          ok: memoryAllowed,
+          storage: "memory",
+          productionReady: false,
+          realtime: "websocket",
+          ...(memoryAllowed ? {} : { error: { code: "REDIS_REQUIRED", message: "REDIS_URL chưa được cấu hình cho môi trường production." } }),
+        });
+      }
+      const healthy = await checkRedisHealth();
+      return send(response, healthy ? 200 : 503, {
+        ok: healthy,
+        storage: "redis",
+        productionReady: healthy,
+        realtime: "websocket",
+        ...(healthy ? {} : { error: { code: "REDIS_UNAVAILABLE", message: "Không thể kết nối Redis production." } }),
+      });
     }
     const service = getRoomService();
     if (request.method === "POST" && url.pathname === "/api/rooms") {
+      enforceRateLimit("create-room", getIncomingAddress(request.headers), 10, 60_000);
       const body = createSchema.parse(await readJson(request));
       return send(response, 201, { room: await service.createRoom(body.gameId, body.identity) });
     }
@@ -34,7 +53,10 @@ export async function handleLocalApi(request: IncomingMessage, response: ServerR
     if (parts[1] === "rooms" && parts[2] && parts[3] === "actions" && request.method === "POST") {
       const body = mutationSchema.parse(await readJson(request));
       const code = parts[2];
-      if (body.intent === "join") return send(response, 200, { room: await service.joinRoom(code, body.identity) });
+      if (body.intent === "join") {
+        enforceRateLimit("join-room", getIncomingAddress(request.headers), 30, 60_000);
+        return send(response, 200, { room: await service.joinRoom(code, body.identity) });
+      }
       if (body.intent === "ready") return send(response, 200, { room: await service.setReady(code, body.identity, body.ready ?? true) });
       if (body.intent === "start") return send(response, 200, { room: await service.startGame(code, body.identity) });
       if (body.intent === "restart") return send(response, 200, { room: await service.restartGame(code, body.identity) });
@@ -46,7 +68,7 @@ export async function handleLocalApi(request: IncomingMessage, response: ServerR
   } catch (error) {
     if (isAppError(error)) return send(response, error.status, { error: { code: error.code, message: error.message } });
     if (error instanceof z.ZodError) return send(response, 400, { error: { code: "INVALID_INPUT", message: "Dữ liệu gửi lên không hợp lệ." } });
-    if (error instanceof Error && error.message.includes("REDIS_URL")) return send(response, 503, { error: { code: "REDIS_REQUIRED", message: "Redis chưa được cấu hình cho môi trường production." } });
+    if (error instanceof RedisConfigurationError) return send(response, 503, { error: { code: error.code, message: error.message } });
     return send(response, 500, { error: { code: "INTERNAL_ERROR", message: "Đã có lỗi xảy ra." } });
   }
 }

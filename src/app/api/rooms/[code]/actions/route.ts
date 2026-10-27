@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
 import { getRoomService } from "@/modules/room/service-singleton";
 import { identitySchema } from "@/modules/realtime/protocol";
+import { enforceRateLimit, getRequestAddress } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -19,7 +20,10 @@ export async function POST(request: Request, context: { params: Promise<{ code: 
     const { code } = await context.params;
     const body = mutationSchema.parse(await request.json());
     const service = getRoomService();
-    if (body.intent === "join") return NextResponse.json({ room: await service.joinRoom(code, body.identity) });
+    if (body.intent === "join") {
+      enforceRateLimit("join-room", getRequestAddress(request), 30, 60_000);
+      return NextResponse.json({ room: await service.joinRoom(code, body.identity) });
+    }
     if (body.intent === "ready") return NextResponse.json({ room: await service.setReady(code, body.identity, body.ready ?? true) });
     if (body.intent === "start") return NextResponse.json({ room: await service.startGame(code, body.identity) });
     if (body.intent === "restart") return NextResponse.json({ room: await service.restartGame(code, body.identity) });

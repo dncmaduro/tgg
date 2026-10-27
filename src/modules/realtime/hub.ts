@@ -1,17 +1,18 @@
 import { subscribeToRoomEvents, type RoomEvent } from "@/modules/realtime/event-bus";
 import { encodeServerMessage, type ServerMessage } from "@/modules/realtime/protocol";
 
-export type SocketLike = { send(data: string): void; readyState?: number };
+export type SocketLike = { send(data: string): void; close?: (code?: number, reason?: string) => void; readyState?: number };
 
 export class RealtimeHub {
   private readonly rooms = new Map<string, Set<SocketLike>>();
   private readonly socketRooms = new Map<SocketLike, string>();
-
-  constructor() {
-    subscribeToRoomEvents((event) => this.onRoomEvent(event));
-  }
+  private unsubscribeFromRoomEvents: (() => void) | undefined;
 
   add(code: string, socket: SocketLike): void {
+    this.remove(socket);
+    if (!this.unsubscribeFromRoomEvents) {
+      this.unsubscribeFromRoomEvents = subscribeToRoomEvents((event) => this.onRoomEvent(event));
+    }
     const room = this.rooms.get(code) ?? new Set<SocketLike>();
     room.add(socket);
     this.rooms.set(code, room);
@@ -25,11 +26,19 @@ export class RealtimeHub {
     room?.delete(socket);
     if (room && room.size === 0) this.rooms.delete(code);
     this.socketRooms.delete(socket);
+    if (this.socketRooms.size === 0) {
+      this.unsubscribeFromRoomEvents?.();
+      this.unsubscribeFromRoomEvents = undefined;
+    }
     return code;
   }
 
   send(socket: SocketLike, message: ServerMessage): void {
-    socket.send(encodeServerMessage(message));
+    try {
+      socket.send(encodeServerMessage(message));
+    } catch {
+      this.remove(socket);
+    }
   }
 
   broadcast(code: string, message: ServerMessage): void {
@@ -37,6 +46,10 @@ export class RealtimeHub {
     if (!sockets) return;
     const encoded = encodeServerMessage(message);
     for (const socket of sockets) {
+      if (socket.readyState !== undefined && socket.readyState !== 1) {
+        this.remove(socket);
+        continue;
+      }
       try {
         socket.send(encoded);
       } catch {

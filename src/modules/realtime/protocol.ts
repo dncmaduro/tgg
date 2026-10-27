@@ -1,6 +1,8 @@
 import { z } from "zod";
 import type { RoomSnapshot } from "@/types/domain";
 
+export const MAX_WEBSOCKET_MESSAGE_BYTES = 8 * 1024;
+
 export const identitySchema = z.object({
   playerId: z.string().min(8).max(100),
   credential: z.string().min(8).max(200),
@@ -8,8 +10,8 @@ export const identitySchema = z.object({
 });
 
 export const clientMessageSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("room:subscribe"), code: z.string().length(6), identity: identitySchema }),
-  z.object({ type: z.literal("room:leave"), code: z.string().length(6), identity: identitySchema }),
+  z.object({ type: z.literal("room:subscribe"), code: z.string().regex(/^\d{6}$/), identity: identitySchema }),
+  z.object({ type: z.literal("room:leave"), code: z.string().regex(/^\d{6}$/), identity: identitySchema }),
 ]);
 
 export type ClientMessage = z.infer<typeof clientMessageSchema>;

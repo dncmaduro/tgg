@@ -9,7 +9,7 @@ importers:
   .:
     dependencies:
       '@vercel/functions':
-        specifier: ^3.0.0
+        specifier: ^3.10.0
         version: 3.10.1(ws@8.22.0)
       ioredis:
         specifier: ^5.7.0

@@ -1,11 +1,12 @@
+.vercel
 node_modules
 .next
 out
 playwright-report
 test-results
-.env
-.env.local
-.env.*.local
+.env*
 !.env.example
+*.secret
+*.secrets
 *.log
 *.tsbuildinfo

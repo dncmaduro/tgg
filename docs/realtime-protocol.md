@@ -1,6 +1,6 @@
 # Realtime protocol
 
-Endpoint: `GET /api/ws` over `ws://` locally or `wss://` in production.
+Endpoint: `GET /ws` over `ws://` with the local Node adapter; the Vercel deployment endpoint is `GET /api/ws` over `wss://`.
 
 ## Client → server
 

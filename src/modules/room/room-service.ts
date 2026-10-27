@@ -21,7 +21,9 @@ function normalizeNickname(nickname: string): string {
 }
 
 function normalizeCode(code: string): string {
-  return code.trim().replace(/\D/g, "").slice(0, 6);
+  const normalized = code.trim();
+  if (!/^\d{6}$/.test(normalized)) throw new AppError("INVALID_ROOM_CODE", "Mã phòng phải gồm 6 chữ số.");
+  return normalized;
 }
 
 function makeCode(): string {
@@ -91,6 +93,7 @@ export class RoomService {
       try {
         await this.store.create(room);
         const result = snapshot(room);
+        console.info("[MiniPlay room] created", { code: room.code, gameId: room.gameId, playerId: identity.playerId });
         await publishRoomEvent(result);
         return result;
       } catch (error) {
@@ -145,7 +148,7 @@ export class RoomService {
   }
 
   async startGame(code: string, identity: IdentityInput): Promise<RoomSnapshot> {
-    return this.mutateAuthorized(code, identity, (room, player) => {
+    const result = await this.mutateAuthorized(code, identity, (room, player) => {
       const game = getSupportedGame(room.gameId);
       if (!player.isHost || room.hostId !== player.id) throw new AppError("HOST_ONLY", "Chỉ host mới có thể bắt đầu.", 403);
       if (room.status !== "WAITING") throw new AppError("ROOM_NOT_WAITING", "Phòng không còn ở trạng thái chờ.");
@@ -155,16 +158,20 @@ export class RoomService {
       room.gameState = game.engine.createInitialState(room.players.map((candidate) => candidate.id));
       return room;
     });
+    console.info("[MiniPlay game] started", { code: result.code, gameId: result.gameId, players: result.players.length });
+    return result;
   }
 
   async applyAction(code: string, identity: IdentityInput, action: GameAction): Promise<RoomSnapshot> {
-    return this.mutateAuthorized(code, identity, (room, player) => {
+    const result = await this.mutateAuthorized(code, identity, (room, player) => {
       const game = getSupportedGame(room.gameId);
       if (room.status !== "PLAYING" || !room.gameState) throw new AppError("GAME_NOT_PLAYING", "Ván chơi chưa bắt đầu hoặc đã kết thúc.");
       room.gameState = game.engine.applyAction(room.gameState, action, player.id);
       if (game.engine.getResult(room.gameState).finished) room.status = "FINISHED";
       return room;
     });
+    if (result.status === "FINISHED") console.info("[MiniPlay game] ended", { code: result.code, gameId: result.gameId, revision: result.revision });
+    return result;
   }
 
   async restartGame(code: string, identity: IdentityInput): Promise<RoomSnapshot> {

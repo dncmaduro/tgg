@@ -24,7 +24,7 @@ pnpm build        # production build
 pnpm start        # production server + native ws adapter
 pnpm typecheck    # strict TypeScript check
 pnpm test         # Vitest unit/integration tests
-pnpm test:e2e     # Playwright flow (requires a running app)
+pnpm test:e2e      # Playwright flow (starts a production-shaped local app)
 ```
 
-See [docs/architecture.md](docs/architecture.md), [docs/realtime-protocol.md](docs/realtime-protocol.md), and [docs/game-development.md](docs/game-development.md) for the implementation details and extension points.
+See [docs/deployment.md](docs/deployment.md), [docs/architecture.md](docs/architecture.md), [docs/realtime-protocol.md](docs/realtime-protocol.md), and [docs/game-development.md](docs/game-development.md) for deployment, implementation details, and extension points.

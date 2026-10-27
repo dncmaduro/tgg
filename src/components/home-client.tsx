@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { gameRegistry } from "@/modules/game/registry";
 import { getClientIdentity, updateNickname, type ClientIdentity } from "@/modules/identity/client";
 
-type Health = { storage: "redis" | "memory"; productionReady: boolean; realtime: string };
+type Health = { ok: boolean; storage: "redis" | "memory"; productionReady: boolean; realtime: string; error?: { message?: string } };
 
 export function HomeClient() {
   const router = useRouter();
@@ -110,7 +110,7 @@ export function HomeClient() {
           })}
         </div>
         {error && <div role="alert" className="mt-5 rounded-2xl border border-coral/30 bg-coral/10 px-4 py-3 text-sm text-coral">{error}</div>}
-        <div className="mt-6 flex flex-col items-start justify-between gap-3 rounded-2xl border border-white/10 bg-white/[.03] p-4 text-sm sm:flex-row sm:items-center"><span className="text-slate-400">{health?.storage === "redis" ? "Redis đang đồng bộ state giữa các instance." : "Local-only: chưa có REDIS_URL, state đang nằm trong memory của process."}</span><button onClick={createRoom} disabled={busy} className="inline-flex items-center gap-2 rounded-xl bg-mint px-4 py-2.5 text-sm font-black text-ink transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">{busy ? "đang mở phòng…" : "tạo phòng mới"}<ArrowRight size={16} /></button></div>
+        <div className="mt-6 flex flex-col items-start justify-between gap-3 rounded-2xl border border-white/10 bg-white/[.03] p-4 text-sm sm:flex-row sm:items-center"><span className="text-slate-400">{health?.storage === "redis" ? (health.ok ? "Redis đang đồng bộ state giữa các instance." : health.error?.message ?? "Redis production chưa sẵn sàng.") : health?.ok === false ? health.error?.message ?? "Redis là bắt buộc trong production." : "Local-only: chưa có REDIS_URL, state đang nằm trong memory của process."}</span><button onClick={createRoom} disabled={busy} className="inline-flex items-center gap-2 rounded-xl bg-mint px-4 py-2.5 text-sm font-black text-ink transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">{busy ? "đang mở phòng…" : "tạo phòng mới"}<ArrowRight size={16} /></button></div>
       </section>
       <footer className="relative mx-auto flex max-w-6xl items-center justify-between border-t border-white/10 py-6 text-xs text-slate-600"><span>MiniPlay · phase 1 foundation</span><span className="hidden sm:block">WebSocket realtime · server authoritative</span></footer>
     </main>

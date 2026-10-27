@@ -19,13 +19,13 @@ The client may display its player ID, but the server always authorizes mutations
 
 Room records are the source of truth. A room has a six-digit code, game ID, host ID, players, lifecycle status, game state, revision, timestamps, and an expiry deadline. Redis keys use `miniplay:room:v1:<code>` and expire after 12 hours.
 
-Redis mutations use `WATCH` + `MULTI/EXEC` with a bounded retry loop. Local development uses a clearly reported memory adapter only when `REDIS_URL` is absent; production rejects room mutations without Redis.
+Redis mutations use `WATCH` + `MULTI/EXEC` with a bounded retry loop and always restore `WATCH` state when validation fails. Production requires a `redis://` or `rediss://` TCP/TLS URL; an Upstash REST URL/token is rejected. Local development uses a clearly reported memory adapter only when `REDIS_URL` is absent; production rejects room mutations without Redis.
 
 ## Realtime
 
-The WebSocket transport is intentionally thin. It accepts `room:subscribe`, validates the identity, and registers the socket with the local hub. HTTP mutations publish a `room.updated` event. The hub broadcasts locally and appends the event to a Redis Stream. Other function instances block on `XREAD` and forward new events to their local sockets. There is no tight Redis polling loop.
+The WebSocket transport is intentionally thin. It accepts `room:subscribe`, validates the identity and an 8 KiB frame limit, and registers the socket with the local hub. HTTP mutations publish a `room.updated` event. The hub broadcasts locally and appends the event to a bounded Redis Stream (`MAXLEN ~ 5000`). Other function instances block on `XREAD` and forward new events to their local sockets. The relay has a separate blocking connection and stops when the instance has no subscribed sockets; there is no tight Redis polling loop.
 
-The local `server.ts` adapter uses the native `ws` package so `pnpm dev` can be tested with two browser tabs. The Vercel route uses `experimental_upgradeWebSocket` from `@vercel/functions`, following Vercel's current WebSocket Functions guidance. Vercel Functions pin a socket to one function instance, so Redis is required for cross-instance state and event delivery.
+The local `server.ts` adapter uses the native `ws` package at `/ws` so `pnpm dev` can be tested with two browser tabs without colliding with Next's `/api/ws` route. The Vercel route uses `upgradeWebSocket` from `@vercel/functions` 3.10+ at `/api/ws`, following Vercel's current WebSocket Functions guidance. Vercel Functions pin a socket to one function instance, so Redis is required for cross-instance state and event delivery.
 
 ## Game boundary
 

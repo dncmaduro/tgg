@@ -8,12 +8,16 @@ import type { ServerMessage } from "@/modules/realtime/protocol";
 type ConnectionState = "connecting" | "online" | "offline";
 type Intent = "join" | "ready" | "start" | "action" | "restart" | "leave";
 
+function debugSocket(event: string, details: Record<string, unknown> = {}): void {
+  if (typeof window !== "undefined" && window.localStorage.getItem("miniplay:debug-ws") === "1") {
+    console.error(`[MiniPlay browser ws] ${event}`, details);
+  }
+}
+
 function getWebSocketUrl(): string {
   const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-  const host = window.location.hostname === "localhost"
-    ? `127.0.0.1${window.location.port ? `:${window.location.port}` : ""}`
-    : window.location.host;
-  return `${protocol}://${host}/api/ws`;
+  const local = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+  return `${protocol}://${window.location.host}${local ? "/ws" : "/api/ws"}`;
 }
 
 export function useRoom(code: string, identity: ClientIdentity) {
@@ -76,11 +80,13 @@ export function useRoom(code: string, identity: ClientIdentity) {
       socket = new WebSocket(getWebSocketUrl());
       socketRef.current = socket;
       socket.onopen = () => {
+        debugSocket("open", { code });
         retryRef.current = 1_000;
         setConnection("online");
         socket.send(JSON.stringify({ type: "room:subscribe", code, identity }));
       };
       socket.onmessage = (event) => {
+        debugSocket("message", { bytes: String(event.data).length });
         try {
           const message = JSON.parse(event.data as string) as ServerMessage;
           if (message.type === "room:subscribed" || message.type === "room:updated") {
@@ -92,13 +98,17 @@ export function useRoom(code: string, identity: ClientIdentity) {
           setError("Nhận dữ liệu realtime không hợp lệ.");
         }
       };
-      socket.onclose = () => {
+      socket.onclose = (event) => {
+        debugSocket("close", { code: event.code, reason: event.reason, wasClean: event.wasClean });
         if (stoppedRef.current) return;
         setConnection("offline");
         reconnectTimerRef.current = setTimeout(connect, retryRef.current);
         retryRef.current = Math.min(retryRef.current * 2, 30_000);
       };
-      socket.onerror = () => setConnection("offline");
+      socket.onerror = (event) => {
+        debugSocket("error", { type: event.type });
+        setConnection("offline");
+      };
     };
     connect();
     return () => {

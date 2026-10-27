@@ -9,5 +9,6 @@ describe("realtime protocol", () => {
 
   it("rejects malformed codes and identity payloads", () => {
     expect(() => clientMessageSchema.parse({ type: "room:subscribe", code: "123", identity: { playerId: "x", credential: "y", nickname: "A" } })).toThrow();
+    expect(() => clientMessageSchema.parse({ type: "room:subscribe", code: "12ab34", identity: { playerId: "player-123", credential: "credential-123", nickname: "Mèo" } })).toThrow();
   });
 });
