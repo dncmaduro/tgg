@@ -1,6 +1,6 @@
 # MiniPlay
 
-MiniPlay is a small multiplayer mini-game platform built with Next.js App Router, TypeScript, WebSockets, Redis, and a server-authoritative game engine. The first playable game is Tic-Tac-Toe (Caro mini).
+MiniPlay is a small multiplayer mini-game platform built with Next.js App Router, TypeScript, WebSockets, Redis, and browser game runtimes. It includes Tic-Tac-Toe (Caro mini), Nối từ, and FPS Arena.
 
 ## Quick start
 
@@ -28,3 +28,5 @@ pnpm test:e2e      # Playwright flow (starts a production-shaped local app)
 ```
 
 See [docs/deployment.md](docs/deployment.md), [docs/architecture.md](docs/architecture.md), [docs/realtime-protocol.md](docs/realtime-protocol.md), and [docs/game-development.md](docs/game-development.md) for deployment, implementation details, and extension points.
+
+FPS Arena implementation notes and verification boundaries are in [docs/fps-arena.md](docs/fps-arena.md).

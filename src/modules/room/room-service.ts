@@ -173,9 +173,16 @@ export class RoomService {
       if (!room.gameState || room.status === "WAITING") throw new AppError("GAME_NOT_PLAYING", "Ván chơi chưa bắt đầu hoặc đã kết thúc.");
       const now = Date.now();
       const before = room.gameState;
+      const isFpsControlAction = game.id === "fps-arena" && (action.type === "fps-begin-match" || action.type === "fps-finish-match");
+      if (isFpsControlAction && !player.isHost) throw new AppError("HOST_ONLY", "Chỉ host mới có thể điều khiển vòng FPS.", 403);
       const advanced = game.engine.advance ? game.engine.advance(before, now) : before;
       room.gameState = advanced;
       updateRoomStatus(room, game.engine);
+      if (isFpsControlAction) {
+        room.gameState = game.engine.applyAction(action.type === "fps-finish-match" ? before : advanced, action, player.id, now);
+        updateRoomStatus(room, game.engine);
+        return room;
+      }
       if (advanced !== before) return room;
       if (room.status !== "PLAYING") throw new AppError("GAME_NOT_PLAYING", "Ván chơi chưa bắt đầu hoặc đã kết thúc.");
       room.gameState = game.engine.applyAction(room.gameState, action, player.id, now);

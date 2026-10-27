@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { MemoryRoomStore } from "@/modules/room/memory-store";
 import { RoomService } from "@/modules/room/room-service";
-import type { TicTacToeState } from "@/types/domain";
+import type { FpsArenaState, TicTacToeState } from "@/types/domain";
 
 const identity = (playerId: string, nickname: string) => ({ playerId, credential: `${playerId}-credential`, nickname });
 
@@ -111,5 +111,25 @@ describe("room service", () => {
     expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
     expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
     expect((results.find((result) => result.status === "rejected") as PromiseRejectedResult).reason).toMatchObject({ code: "NOT_YOUR_TURN" });
+  });
+
+  it("keeps FPS runtime outside Redis and persists only host lifecycle/result actions", async () => {
+    const service = new RoomService(new MemoryRoomStore());
+    const host = identity("fps-host", "Host");
+    const guest = identity("fps-guest", "Guest");
+    const room = await service.createRoom("fps-arena", host);
+    await service.joinRoom(room.code, guest);
+    await service.setReady(room.code, host, true);
+    await service.setReady(room.code, guest, true);
+    const started = await service.startGame(room.code, host);
+    expect((started.gameState as FpsArenaState).phase).toBe("CONNECTING");
+    await expect(service.applyAction(room.code, guest, { type: "fps-begin-match", payload: {} })).rejects.toMatchObject({ code: "HOST_ONLY" });
+    const countdown = await service.applyAction(room.code, host, { type: "fps-begin-match", payload: {} });
+    expect((countdown.gameState as FpsArenaState).phase).toBe("COUNTDOWN");
+    await expect(service.applyAction(room.code, guest, { type: "fps-finish-match", payload: {} })).rejects.toMatchObject({ code: "HOST_ONLY" });
+    const finished = await service.applyAction(room.code, host, { type: "fps-finish-match", payload: { reason: "score", scores: { "fps-host": { kills: 10, deaths: 0 }, "fps-guest": { kills: 0, deaths: 1 } } } });
+    expect(finished.status).toBe("FINISHED");
+    expect((finished.gameState as FpsArenaState).winnerIds).toEqual([host.playerId]);
+    expect((await service.restartGame(room.code, host)).status).toBe("WAITING");
   });
 });

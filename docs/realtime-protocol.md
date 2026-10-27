@@ -20,6 +20,7 @@ The currently implemented client messages are:
 
 - `room:subscribe` — authorize the player, mark presence online, and receive a snapshot.
 - `room:leave` — leave explicitly and transfer host if necessary.
+- `webrtc:signal` — forward an authenticated offer, answer, or ICE candidate to another player in the same room. This is used by FPS Arena only.
 
 Game mutations use HTTP `POST /api/rooms/:code/actions`; this keeps command validation and optimistic concurrency in one place. The WebSocket then distributes the resulting snapshot.
 
@@ -28,6 +29,8 @@ Game mutations use HTTP `POST /api/rooms/:code/actions`; this keeps command vali
 - `room:subscribed` — initial snapshot for the socket.
 - `room:updated` — a newer snapshot, including a monotonically increasing `revision`.
 - `system:error` — typed error code and user-facing message.
+
+FPS Arena does not send movement or aiming frames through this WebSocket. After signaling, the browser peers use two WebRTC DataChannels: an unreliable channel for sequenced input/snapshots and a reliable channel for fire, combat, resync, and lifecycle events.
 
 Example:
 

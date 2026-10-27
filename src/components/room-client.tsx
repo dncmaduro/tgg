@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { ArrowLeft, Check, Copy, Crown, Link2, LogOut, RefreshCw, WifiOff } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -12,12 +13,14 @@ import type { GameAction } from "@/modules/game/core/types";
 import { getClientIdentity, updateNickname, type ClientIdentity } from "@/modules/identity/client";
 import type { RoomSnapshot } from "@/types/domain";
 
+const FpsArenaGame = dynamic(() => import("@/modules/game/implementations/fps-arena/ui/fps-game").then((module) => module.FpsArenaGame), { ssr: false });
+
 export function RoomClient({ code }: { code: string }) {
   const router = useRouter();
   const [identity, setIdentity] = useState<ClientIdentity>({ playerId: "", credential: "", nickname: "" });
   const [toast, setToast] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
-  const { room, setRoom, connection, loading, error, setError, mutate } = useRoom(code, identity);
+  const { room, setRoom, connection, loading, error, setError, mutate, sendRealtime, subscribeRealtime } = useRoom(code, identity);
 
   useEffect(() => {
     queueMicrotask(() => setIdentity(getClientIdentity()));
@@ -27,6 +30,13 @@ export function RoomClient({ code }: { code: string }) {
   const isHost = Boolean(me?.isHost && room?.hostId === identity.playerId);
   const needsNickname = Boolean(room && !me);
   const sendGameAction = useCallback((action: GameAction) => mutate("action", { action }), [mutate]);
+  const sendFpsAction = useCallback(async (action: GameAction) => {
+    try {
+      await mutate("action", { action });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Không thể cập nhật trận đấu.");
+    }
+  }, [mutate, setError]);
 
   const run = async (intent: "ready" | "start" | "action" | "restart" | "leave", extras: Record<string, unknown> = {}) => {
     try {
@@ -104,6 +114,7 @@ export function RoomClient({ code }: { code: string }) {
         {room.status === "WAITING" && me && <WaitingRoom room={room} identity={identity} isHost={isHost} onReady={() => void run("ready", { ready: !me.ready })} onStart={() => void run("start")} onLeave={() => void leave()} onCopy={(value, message) => void copy(value, message)} />}
         {room.status !== "WAITING" && me && room.gameId === "tic-tac-toe" && <TicTacToeGame room={room} playerId={identity.playerId} isHost={isHost} disabled={connection !== "online"} onAction={(position) => void sendGameAction({ type: "place-mark", payload: { position } })} onRestart={() => void run("restart")} onLeave={() => void leave()} />}
         {room.status !== "WAITING" && me && room.gameId === "word-chain" && <WordChainGame room={room} playerId={identity.playerId} isHost={isHost} disabled={connection !== "online"} onAction={sendGameAction} onRestart={() => void run("restart")} onLeave={() => void leave()} />}
+        {room.status !== "WAITING" && me && room.gameId === "fps-arena" && <FpsArenaGame room={room} identity={identity} isHost={isHost} connection={connection} sendRealtime={sendRealtime} subscribeRealtime={subscribeRealtime} onAction={sendFpsAction} onRestart={() => void run("restart")} onLeave={() => void leave()} />}
 
         {displayError && <div role="alert" className="mt-6 flex items-center justify-between gap-4 rounded-xl border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm text-red-200"><span>{displayError}</span><button type="button" onClick={() => setError(null)} className="text-xs font-semibold text-red-100">Đóng</button></div>}
         {toast && <div role="status" className="fixed bottom-6 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-xl border border-mint/30 bg-panel px-4 py-2.5 text-sm font-semibold text-mint"><Check size={15} /> {toast}</div>}

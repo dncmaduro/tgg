@@ -1,12 +1,14 @@
 import type { AnyGameEngine } from "@/modules/game/core/types";
 import { ticTacToeEngine } from "@/modules/game/implementations/tic-tac-toe/engine";
 import { wordChainEngine } from "@/modules/game/implementations/word-chain/engine";
+import { fpsArenaEngine } from "@/modules/game/implementations/fps-arena/engine/match-state";
 import { getGameDefinition, type GameDefinition } from "@/modules/game/registry";
 import type { GameId } from "@/types/domain";
 
 const engines: Partial<Record<GameId, AnyGameEngine>> = {
   "tic-tac-toe": ticTacToeEngine,
   "word-chain": wordChainEngine,
+  "fps-arena": fpsArenaEngine,
 };
 
 export function getSupportedGame(gameId: string): GameDefinition & { engine: AnyGameEngine } {

@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ClientIdentity } from "@/modules/identity/client";
 import type { RoomSnapshot } from "@/types/domain";
-import type { ServerMessage } from "@/modules/realtime/protocol";
+import type { ClientMessage, ServerMessage } from "@/modules/realtime/protocol";
 
 type ConnectionState = "connecting" | "online" | "offline";
 type Intent = "join" | "ready" | "start" | "action" | "restart" | "leave";
+type RealtimeListener = (message: ServerMessage) => void;
 
 export class RoomMutationError extends Error {
   constructor(public readonly code: string, message: string) {
@@ -36,6 +37,7 @@ export function useRoom(code: string, identity: ClientIdentity) {
   const retryRef = useRef(1_000);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stoppedRef = useRef(false);
+  const listenersRef = useRef(new Set<RealtimeListener>());
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -64,6 +66,18 @@ export function useRoom(code: string, identity: ClientIdentity) {
     setError(null);
     return body.room ?? null;
   }, [code, identity]);
+
+  const sendRealtime = useCallback((message: ClientMessage): boolean => {
+    const socket = socketRef.current;
+    if (!socket || socket.readyState !== WebSocket.OPEN) return false;
+    socket.send(JSON.stringify(message));
+    return true;
+  }, []);
+
+  const subscribeRealtime = useCallback((listener: RealtimeListener) => {
+    listenersRef.current.add(listener);
+    return () => listenersRef.current.delete(listener);
+  }, []);
 
   useEffect(() => {
     stoppedRef.current = false;
@@ -97,10 +111,11 @@ export function useRoom(code: string, identity: ClientIdentity) {
         try {
           const message = JSON.parse(event.data as string) as ServerMessage;
           if (message.type === "room:subscribed" || message.type === "room:updated") {
-            setRoom(message.room);
+            setRoom((current) => current && current.revision > message.room.revision ? current : message.room);
             setError(null);
           }
           if (message.type === "system:error") setError(message.message);
+          for (const listener of listenersRef.current) listener(message);
         } catch {
           setError("Nhận dữ liệu realtime không hợp lệ.");
         }
@@ -127,5 +142,5 @@ export function useRoom(code: string, identity: ClientIdentity) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code, identity.playerId, identity.credential, identity.nickname]);
 
-  return { room, setRoom, connection, loading, error, setError, refresh, mutate };
+  return { room, setRoom, connection, loading, error, setError, refresh, mutate, sendRealtime, subscribeRealtime };
 }

@@ -1,6 +1,6 @@
 export type RoomStatus = "WAITING" | "PLAYING" | "FINISHED" | "CLOSED";
 
-export type GameId = "tic-tac-toe" | "word-chain" | "caro" | "uno" | "chess" | "werewolf";
+export type GameId = "tic-tac-toe" | "word-chain" | "fps-arena" | "caro" | "uno" | "chess" | "werewolf";
 
 export type PlayerSymbol = "X" | "O";
 
@@ -50,7 +50,26 @@ export type WordChainState = {
   acceptedChallengeWords: string[];
 };
 
-export type GameState = TicTacToeState | WordChainState;
+export type FpsArenaPhase = "CONNECTING" | "COUNTDOWN" | "PLAYING" | "FINISHED";
+
+export type FpsArenaScore = {
+  kills: number;
+  deaths: number;
+};
+
+export type FpsArenaState = {
+  phase: FpsArenaPhase;
+  playerIds: string[];
+  scores: Record<string, FpsArenaScore>;
+  countdownEndsAt: number | null;
+  startedAt: number | null;
+  endsAt: number | null;
+  winnerIds: string[];
+  finishReason: "score" | "time" | null;
+  stateRevision: number;
+};
+
+export type GameState = TicTacToeState | WordChainState | FpsArenaState;
 
 export type PlayerRecord = {
   id: string;

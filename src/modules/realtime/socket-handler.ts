@@ -46,11 +46,29 @@ export async function receiveSocketMessage(socket: SocketLike, raw: string): Pro
         void service.markConnected(previous.code, previous.identity, false).catch(() => undefined);
       }
       const room = await service.markConnected(message.code, message.identity, true);
-      hub.add(room.code, socket);
+      hub.add(room.code, socket, message.identity.playerId);
       subscriptions.set(socket, { code: room.code, identity: message.identity });
       debugRealtime("subscribe ok", { code: room.code, players: room.players.length, revision: room.revision });
       debugRealtime("sending subscribed", { readyState: socket.readyState });
       hub.send(socket, { type: "room:subscribed", room });
+      return;
+    }
+
+    if (message.type === "webrtc:signal") {
+      const subscription = subscriptions.get(socket);
+      if (!subscription || subscription.code !== message.code || subscription.identity.playerId !== message.identity.playerId || subscription.identity.credential !== message.identity.credential) {
+        throw new AppError("UNAUTHORIZED_PLAYER", "Phiên người chơi không hợp lệ.", 403);
+      }
+      const room = await service.getSnapshot(message.code);
+      if (!room.players.some((player) => player.id === message.targetPlayerId)) {
+        throw new AppError("PLAYER_NOT_IN_ROOM", "Người chơi đích không ở trong phòng.", 403);
+      }
+      hub.sendToPlayer(room.code, message.targetPlayerId, {
+        type: "webrtc:signal",
+        code: room.code,
+        fromPlayerId: message.identity.playerId,
+        signal: message.signal,
+      });
       return;
     }
 

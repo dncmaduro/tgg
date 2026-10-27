@@ -6,9 +6,10 @@ export type SocketLike = { send(data: string): void; close?: (code?: number, rea
 export class RealtimeHub {
   private readonly rooms = new Map<string, Set<SocketLike>>();
   private readonly socketRooms = new Map<SocketLike, string>();
+  private readonly socketPlayers = new Map<SocketLike, string>();
   private unsubscribeFromRoomEvents: (() => void) | undefined;
 
-  add(code: string, socket: SocketLike): void {
+  add(code: string, socket: SocketLike, playerId?: string): void {
     this.remove(socket);
     if (!this.unsubscribeFromRoomEvents) {
       this.unsubscribeFromRoomEvents = subscribeToRoomEvents((event) => this.onRoomEvent(event));
@@ -17,6 +18,7 @@ export class RealtimeHub {
     room.add(socket);
     this.rooms.set(code, room);
     this.socketRooms.set(socket, code);
+    if (playerId) this.socketPlayers.set(socket, playerId);
   }
 
   remove(socket: SocketLike): string | undefined {
@@ -26,6 +28,7 @@ export class RealtimeHub {
     room?.delete(socket);
     if (room && room.size === 0) this.rooms.delete(code);
     this.socketRooms.delete(socket);
+    this.socketPlayers.delete(socket);
     if (this.socketRooms.size === 0) {
       this.unsubscribeFromRoomEvents?.();
       this.unsubscribeFromRoomEvents = undefined;
@@ -55,6 +58,14 @@ export class RealtimeHub {
       } catch {
         this.remove(socket);
       }
+    }
+  }
+
+  sendToPlayer(code: string, playerId: string, message: ServerMessage): void {
+    const sockets = this.rooms.get(code);
+    if (!sockets) return;
+    for (const socket of sockets) {
+      if (this.socketPlayers.get(socket) === playerId) this.send(socket, message);
     }
   }
 

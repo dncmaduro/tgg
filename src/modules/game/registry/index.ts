@@ -9,6 +9,7 @@ export type GameDefinition = {
   minPlayers: number;
   maxPlayers: number;
   status: "available" | "coming-soon";
+  category?: "board" | "word" | "action";
   engine?: AnyGameEngine;
 };
 
@@ -30,6 +31,16 @@ export const gameRegistry: GameDefinition[] = [
     minPlayers: 2,
     maxPlayers: 2,
     status: "available",
+  },
+  {
+    id: "fps-arena",
+    title: "FPS Arena",
+    description: "Đấu súng góc nhìn thứ nhất, 2–6 người.",
+    icon: "⊙",
+    minPlayers: 2,
+    maxPlayers: 6,
+    status: "available",
+    category: "action",
   },
   {
     id: "caro",
