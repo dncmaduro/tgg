@@ -17,7 +17,7 @@ export const gameRegistry: GameDefinition[] = [
   {
     id: "tic-tac-toe",
     title: "Caro mini",
-    description: "Trận đấu 3×3 gọn, căng và đủ để phục thù ngay ván sau.",
+    description: "Bàn 3×3, 2 người.",
     icon: "✦",
     minPlayers: 2,
     maxPlayers: 2,
@@ -27,7 +27,7 @@ export const gameRegistry: GameDefinition[] = [
   {
     id: "caro",
     title: "Caro 15×15",
-    description: "Xâu 5 quân liên tiếp trong bàn đấu lớn hơn.",
+    description: "Bàn 15×15, 2 người.",
     icon: "⌁",
     minPlayers: 2,
     maxPlayers: 2,
@@ -36,7 +36,7 @@ export const gameRegistry: GameDefinition[] = [
   {
     id: "uno",
     title: "UNO",
-    description: "Bốc bài, đổi màu và hét UNO đúng lúc.",
+    description: "Từ 2 đến 8 người.",
     icon: "◈",
     minPlayers: 2,
     maxPlayers: 8,
@@ -45,7 +45,7 @@ export const gameRegistry: GameDefinition[] = [
   {
     id: "chess",
     title: "Cờ vua",
-    description: "Một bàn cờ cổ điển cho những nước đi không vội.",
+    description: "Bàn cờ, 2 người.",
     icon: "♞",
     minPlayers: 2,
     maxPlayers: 2,
@@ -54,7 +54,7 @@ export const gameRegistry: GameDefinition[] = [
   {
     id: "werewolf",
     title: "Ma sói",
-    description: "Bí mật, suy luận và những cú bluff lúc nửa đêm.",
+    description: "Từ 5 đến 10 người.",
     icon: "☾",
     minPlayers: 5,
     maxPlayers: 10,

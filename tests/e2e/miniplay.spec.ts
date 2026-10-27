@@ -37,33 +37,36 @@ test("two browser contexts can create, join, ready, play, and rematch", async ({
   observeWebSocket(b, "B");
 
   await a.goto("/");
-  await a.getByPlaceholder("ví dụ: Mèo Lười").fill("Player A");
-  await a.getByRole("button", { name: /tạo phòng mới/i }).click();
+  await a.getByRole("button", { name: /tạo phòng/i }).click();
+  await a.getByRole("dialog").getByLabel("Tên hiển thị").fill("Player A");
+  await a.getByRole("dialog").getByRole("button", { name: /tiếp tục/i }).click();
   await expect(a).toHaveURL(/\/room\/\d{6}$/);
   const code = (await a.locator("text=/^\\d{6}$/").first().textContent())?.trim();
   expect(code).toMatch(/^\d{6}$/);
 
   await b.goto(`/room/${code}`);
-  await b.getByPlaceholder("Tên hiển thị").fill("Player B");
-  await b.getByRole("button", { name: /tham gia phòng/i }).click();
+  await b.getByRole("dialog").getByLabel("Tên hiển thị").fill("Player B");
+  await b.getByRole("dialog").getByRole("button", { name: /tiếp tục/i }).click();
   await expect(b.getByText("Player A")).toBeVisible();
   await expect(a.getByText("Player B")).toBeVisible();
 
-  await a.getByRole("button", { name: /tôi đã sẵn sàng/i }).click();
-  await b.getByRole("button", { name: /tôi đã sẵn sàng/i }).click();
-  await a.getByRole("button", { name: /bắt đầu ván/i }).click();
-  await expect(a.getByRole("heading", { name: /\/ Bạn là [XO]$/ })).toBeVisible();
-  await expect(b.getByRole("heading", { name: /\/ Bạn là [XO]$/ })).toBeVisible();
+  await a.getByRole("button", { name: /^Sẵn sàng$/ }).click();
+  await b.getByRole("button", { name: /^Sẵn sàng$/ }).click();
+  await a.getByRole("button", { name: /^Bắt đầu$/ }).click();
+  await expect(a.getByText(/Bạn là [XO]/)).toBeVisible();
+  await expect(b.getByText(/Bạn là [XO]/)).toBeVisible();
 
   await a.getByRole("button", { name: "Ô 1" }).click();
   await b.getByRole("button", { name: "Ô 4" }).click();
   await a.getByRole("button", { name: "Ô 2" }).click();
   await b.getByRole("button", { name: "Ô 5" }).click();
   await a.getByRole("button", { name: "Ô 3" }).click();
-  await expect(a.getByText(/thắng ván này/)).toBeVisible();
-  await expect(b.getByText(/thắng ván này/)).toBeVisible();
+  await expect(a.getByText(/thắng\.$/)).toBeVisible();
+  await expect(b.getByText(/thắng\.$/)).toBeVisible();
+  await expect(b.getByRole("button", { name: /chơi lại/i })).toHaveCount(0);
+  await expect(b.getByText(/Chờ chủ phòng bắt đầu ván mới/)).toBeVisible();
   await a.getByRole("button", { name: /chơi lại/i }).click();
-  await expect(a.getByText(/Đang chờ đồng đội/)).toBeVisible();
+  await expect(a.getByRole("button", { name: /^Sẵn sàng$/ })).toBeVisible();
 
   await playerA.close();
   await playerB.close();
