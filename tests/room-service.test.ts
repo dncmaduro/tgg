@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { MemoryRoomStore } from "@/modules/room/memory-store";
 import { RoomService } from "@/modules/room/room-service";
+import type { TicTacToeState } from "@/types/domain";
 
 const identity = (playerId: string, nickname: string) => ({ playerId, credential: `${playerId}-credential`, nickname });
 
@@ -19,7 +20,7 @@ describe("room service", () => {
     await service.setReady(created.code, guest, true);
     const playing = await service.startGame(created.code, host);
     expect(playing.status).toBe("PLAYING");
-    expect(playing.gameState?.players[host.playerId]).toBe("X");
+    expect((playing.gameState as TicTacToeState).players[host.playerId]).toBe("X");
   });
 
   it("keeps host-only start and transfers host on leave", async () => {
@@ -91,5 +92,24 @@ describe("room service", () => {
     const room = await service.createRoom("tic-tac-toe", identity("one", "One"));
     await service.joinRoom(room.code, identity("two", "Two"));
     await expect(service.joinRoom(room.code, identity("three", "Three"))).rejects.toMatchObject({ code: "ROOM_FULL" });
+  });
+
+  it("serializes concurrent actions for the same room", async () => {
+    const service = new RoomService(new MemoryRoomStore());
+    const host = identity("concurrent-host", "Host");
+    const guest = identity("concurrent-guest", "Guest");
+    const room = await service.createRoom("tic-tac-toe", host);
+    await service.joinRoom(room.code, guest);
+    await service.setReady(room.code, host, true);
+    await service.setReady(room.code, guest, true);
+    await service.startGame(room.code, host);
+
+    const results = await Promise.allSettled([
+      service.applyAction(room.code, host, { type: "place-mark", payload: { position: 0 } }),
+      service.applyAction(room.code, host, { type: "place-mark", payload: { position: 1 } }),
+    ]);
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
+    expect((results.find((result) => result.status === "rejected") as PromiseRejectedResult).reason).toMatchObject({ code: "NOT_YOUR_TURN" });
   });
 });

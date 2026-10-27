@@ -1,5 +1,6 @@
 import type { GameAction, GameEngine } from "@/modules/game/core/types";
 import type { PlayerSymbol, TicTacToeState } from "@/types/domain";
+import { AppError } from "@/lib/errors";
 
 const winningLines = [
   [0, 1, 2],
@@ -28,13 +29,13 @@ function findResult(state: TicTacToeState): { winnerId: string | null; line: num
   return { winnerId: null, line: [], draw: state.board.every(Boolean) };
 }
 
-export const ticTacToeEngine: GameEngine = {
+export const ticTacToeEngine: GameEngine<TicTacToeState> = {
   id: "tic-tac-toe",
   minPlayers: 2,
   maxPlayers: 2,
 
   createInitialState(playerIds) {
-    if (playerIds.length !== 2) throw new Error("Caro mini cần đúng 2 người chơi.");
+    if (playerIds.length !== 2) throw new AppError("INVALID_PLAYER_COUNT", "Caro mini cần đúng 2 người chơi.");
     return {
       board: Array.from({ length: 9 }, () => null),
       players: assignSymbols(playerIds),
@@ -46,18 +47,18 @@ export const ticTacToeEngine: GameEngine = {
   },
 
   applyAction(state, action: GameAction, playerId) {
-    if (action.type !== "place-mark") throw new Error("Hành động không được hỗ trợ.");
-    if (state.winnerId || state.isDraw) throw new Error("Ván chơi đã kết thúc.");
-    if (!state.players[playerId]) throw new Error("Bạn không thuộc ván chơi này.");
-    if (state.currentPlayerId !== playerId) throw new Error("Chưa đến lượt của bạn.");
+    if (action.type !== "place-mark") throw new AppError("UNSUPPORTED_ACTION", "Hành động không được hỗ trợ.");
+    if (state.winnerId || state.isDraw) throw new AppError("GAME_FINISHED", "Ván chơi đã kết thúc.");
+    if (!state.players[playerId]) throw new AppError("UNAUTHORIZED_PLAYER", "Bạn không thuộc ván chơi này.");
+    if (state.currentPlayerId !== playerId) throw new AppError("NOT_YOUR_TURN", "Chưa đến lượt của bạn.");
 
     const position = typeof action.payload === "object" && action.payload !== null && "position" in action.payload
       ? (action.payload as { position?: unknown }).position
       : undefined;
     if (typeof position !== "number" || !Number.isInteger(position) || position < 0 || position > 8) {
-      throw new Error("Ô cờ không hợp lệ.");
+      throw new AppError("INVALID_MOVE", "Ô cờ không hợp lệ.");
     }
-    if (state.board[position]) throw new Error("Ô cờ đã được đánh.");
+    if (state.board[position]) throw new AppError("OCCUPIED_CELL", "Ô cờ đã được đánh.");
 
     const board = [...state.board];
     board[position] = state.players[playerId];

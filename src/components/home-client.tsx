@@ -85,7 +85,7 @@ export function HomeClient() {
     <main className="min-h-screen px-5 py-6 sm:px-8">
       <header className="mx-auto flex max-w-5xl items-center justify-between">
         <Link href="/" className="text-lg font-semibold tracking-tight text-white" aria-label="MiniPlay trang chủ">MiniPlay</Link>
-        <span className="text-sm text-slate-500">Caro mini</span>
+        <span className="text-sm text-slate-500">Mini game</span>
       </header>
 
       <div className="mx-auto max-w-5xl pb-16 pt-16 sm:pt-24">

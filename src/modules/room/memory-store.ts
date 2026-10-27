@@ -13,6 +13,7 @@ function getSharedRooms(): Map<string, RoomRecord> {
 
 export class MemoryRoomStore implements RoomStore {
   private readonly rooms = getSharedRooms();
+  private readonly mutationLocks = new Map<string, Promise<void>>();
 
   async get(code: string): Promise<RoomRecord | null> {
     const room = this.rooms.get(code);
@@ -30,11 +31,21 @@ export class MemoryRoomStore implements RoomStore {
   }
 
   async mutate<T>(code: string, mutator: (room: RoomRecord) => Mutation<T>): Promise<T> {
-    const current = await this.get(code);
-    if (!current) throw new AppError("ROOM_NOT_FOUND", "Không tìm thấy phòng.", 404);
-    const next = mutator(current);
-    this.rooms.set(code, structuredClone(next.room));
-    return next.result;
+    const previous = this.mutationLocks.get(code) ?? Promise.resolve();
+    let release!: () => void;
+    const currentLock = new Promise<void>((resolve) => { release = resolve; });
+    this.mutationLocks.set(code, currentLock);
+    await previous;
+    try {
+      const current = await this.get(code);
+      if (!current) throw new AppError("ROOM_NOT_FOUND", "Không tìm thấy phòng.", 404);
+      const next = mutator(current);
+      this.rooms.set(code, structuredClone(next.room));
+      return next.result;
+    } finally {
+      release();
+      if (this.mutationLocks.get(code) === currentLock) this.mutationLocks.delete(code);
+    }
   }
 
   async remove(code: string): Promise<void> {

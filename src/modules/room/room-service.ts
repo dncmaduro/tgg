@@ -1,9 +1,10 @@
 import { createHash, randomInt } from "node:crypto";
 import { AppError } from "@/lib/errors";
 import { publishRoomEvent } from "@/modules/realtime/event-bus";
-import { getSupportedGame, getGameDefinition } from "@/modules/game/registry";
-import type { GameAction } from "@/modules/game/core/types";
-import type { GameId, PlayerRecord, RoomRecord, RoomSnapshot } from "@/types/domain";
+import { getGameDefinition } from "@/modules/game/registry";
+import { getSupportedGame } from "@/modules/game/registry/server";
+import type { GameAction, AnyGameEngine } from "@/modules/game/core/types";
+import type { GameId, GameState, PlayerRecord, RoomRecord, RoomSnapshot } from "@/types/domain";
 import type { RoomStore } from "@/modules/room/store";
 
 const ROOM_TTL_MS = 12 * 60 * 60 * 1_000;
@@ -44,10 +45,12 @@ function snapshot(room: RoomRecord): RoomSnapshot {
     gameId: room.gameId,
     gameTitle: game.title,
     gameDescription: game.description,
+    minPlayers: game.minPlayers,
+    maxPlayers: game.maxPlayers,
     status: room.status,
     hostId: room.hostId,
     players: room.players.map(({ credentialHash: _credentialHash, ...player }) => player),
-    gameState: room.gameState,
+    gameState: room.gameState ? getSupportedGame(room.gameId).engine.toPublicState(room.gameState) : null,
     revision: room.revision,
     expiresAt: room.expiresAt,
   };
@@ -57,7 +60,9 @@ export class RoomService {
   constructor(private readonly store: RoomStore) {}
 
   async getSnapshot(code: string): Promise<RoomSnapshot> {
-    const room = await this.store.get(normalizeCode(code));
+    const normalizedCode = normalizeCode(code);
+    await this.settleExpired(normalizedCode);
+    const room = await this.store.get(normalizedCode);
     if (!room) throw new AppError("ROOM_NOT_FOUND", "Không tìm thấy phòng.", 404);
     return snapshot(room);
   }
@@ -155,7 +160,7 @@ export class RoomService {
       if (room.players.length < game.minPlayers) throw new AppError("NOT_ENOUGH_PLAYERS", `Cần ít nhất ${game.minPlayers} người chơi.`);
       if (!room.players.every((candidate) => candidate.ready)) throw new AppError("PLAYERS_NOT_READY", "Tất cả người chơi cần sẵn sàng trước.");
       room.status = "PLAYING";
-      room.gameState = game.engine.createInitialState(room.players.map((candidate) => candidate.id));
+      room.gameState = game.engine.createInitialState(room.players.map((candidate) => candidate.id), Date.now());
       return room;
     });
     console.info("[MiniPlay game] started", { code: result.code, gameId: result.gameId, players: result.players.length });
@@ -165,9 +170,16 @@ export class RoomService {
   async applyAction(code: string, identity: IdentityInput, action: GameAction): Promise<RoomSnapshot> {
     const result = await this.mutateAuthorized(code, identity, (room, player) => {
       const game = getSupportedGame(room.gameId);
-      if (room.status !== "PLAYING" || !room.gameState) throw new AppError("GAME_NOT_PLAYING", "Ván chơi chưa bắt đầu hoặc đã kết thúc.");
-      room.gameState = game.engine.applyAction(room.gameState, action, player.id);
-      if (game.engine.getResult(room.gameState).finished) room.status = "FINISHED";
+      if (!room.gameState || room.status === "WAITING") throw new AppError("GAME_NOT_PLAYING", "Ván chơi chưa bắt đầu hoặc đã kết thúc.");
+      const now = Date.now();
+      const before = room.gameState;
+      const advanced = game.engine.advance ? game.engine.advance(before, now) : before;
+      room.gameState = advanced;
+      updateRoomStatus(room, game.engine);
+      if (advanced !== before) return room;
+      if (room.status !== "PLAYING") throw new AppError("GAME_NOT_PLAYING", "Ván chơi chưa bắt đầu hoặc đã kết thúc.");
+      room.gameState = game.engine.applyAction(room.gameState, action, player.id, now);
+      updateRoomStatus(room, game.engine);
       return room;
     });
     if (result.status === "FINISHED") console.info("[MiniPlay game] ended", { code: result.code, gameId: result.gameId, revision: result.revision });
@@ -196,6 +208,11 @@ export class RoomService {
     }
     const result = await this.store.mutate(normalizedCode, (room) => {
       const player = authorize(room, identity);
+      const game = room.gameState ? getSupportedGame(room.gameId) : undefined;
+      if (game?.engine.onPlayerLeave && room.gameState) {
+        room.gameState = game.engine.onPlayerLeave(room.gameState, player.id, Date.now());
+        updateRoomStatus(room, game.engine);
+      }
       room.players = room.players.filter((candidate) => candidate.id !== player.id);
       if (room.hostId === player.id) {
         const nextHost = room.players[0];
@@ -213,6 +230,7 @@ export class RoomService {
   }
 
   async markConnected(code: string, identity: IdentityInput, connected: boolean): Promise<RoomSnapshot> {
+    await this.settleExpired(normalizeCode(code));
     return this.mutateAuthorized(code, identity, (room, player) => {
       player.connected = connected;
       player.lastSeenAt = Date.now();
@@ -232,6 +250,32 @@ export class RoomService {
     await publishRoomEvent(result);
     return result;
   }
+
+  private async settleExpired(code: string): Promise<void> {
+    const current = await this.store.get(code);
+    if (!current?.gameState) return;
+    const currentGame = getSupportedGame(current.gameId);
+    if (!currentGame.engine.advance) return;
+    let changed = false;
+    const result = await this.store.mutate(code, (room) => {
+      if (!room.gameState) return { room, result: snapshot(room) };
+      const game = getSupportedGame(room.gameId);
+      if (!game.engine.advance) return { room, result: snapshot(room) };
+      const nextState = game.engine.advance(room.gameState, Date.now());
+      if (nextState === room.gameState) return { room, result: snapshot(room) };
+      room.gameState = nextState;
+      updateRoomStatus(room, game.engine);
+      changed = true;
+      return { room, result: snapshot(room) };
+    });
+    if (changed) await publishRoomEvent(result);
+  }
+}
+
+function updateRoomStatus(room: RoomRecord, engine: AnyGameEngine): void {
+  if (!room.gameState) return;
+  const result = engine.getResult(room.gameState);
+  room.status = result.finished ? "FINISHED" : "PLAYING";
 }
 
 export { hashCredential, normalizeNickname, normalizeCode };

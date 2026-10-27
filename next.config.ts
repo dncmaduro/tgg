@@ -8,6 +8,9 @@ const nextConfig: NextConfig = {
     useTypeScriptCli: false,
   },
   serverExternalPackages: ["ioredis", "ws"],
+  outputFileTracingIncludes: {
+    "/*": ["./src/modules/game/implementations/word-chain/data/**/*"],
+  },
 };
 
 export default nextConfig;

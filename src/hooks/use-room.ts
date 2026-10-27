@@ -8,6 +8,13 @@ import type { ServerMessage } from "@/modules/realtime/protocol";
 type ConnectionState = "connecting" | "online" | "offline";
 type Intent = "join" | "ready" | "start" | "action" | "restart" | "leave";
 
+export class RoomMutationError extends Error {
+  constructor(public readonly code: string, message: string) {
+    super(message);
+    this.name = "RoomMutationError";
+  }
+}
+
 function debugSocket(event: string, details: Record<string, unknown> = {}): void {
   if (typeof window !== "undefined" && window.localStorage.getItem("miniplay:debug-ws") === "1") {
     console.error(`[MiniPlay browser ws] ${event}`, details);
@@ -51,8 +58,8 @@ export function useRoom(code: string, identity: ClientIdentity) {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ intent, identity, ...extras }),
     });
-    const body = await response.json() as { room?: RoomSnapshot; error?: { message?: string } };
-    if (!response.ok) throw new Error(body.error?.message ?? "Không thể cập nhật phòng.");
+    const body = await response.json() as { room?: RoomSnapshot; error?: { code?: string; message?: string } };
+    if (!response.ok) throw new RoomMutationError(body.error?.code ?? "ROOM_ACTION_FAILED", body.error?.message ?? "Không thể cập nhật phòng.");
     if (body.room) setRoom(body.room);
     setError(null);
     return body.room ?? null;

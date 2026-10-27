@@ -7,6 +7,9 @@
    - `getResult(state)`
    - `reset(playerIds)`
    - `toPublicState(state, viewerId)`
+   - optionally `advance(state, now)` for server-verified deadline-based state
+     transitions and `onPlayerLeave(state, playerId, now)` for game-specific
+     elimination rules.
 3. Validate every action inside the engine. Never trust coordinates, turn order, or win state from the browser.
 4. Add a `GameDefinition` to `src/modules/game/registry/index.ts`.
 5. Add unit tests for valid/invalid actions, win/draw, and reset.

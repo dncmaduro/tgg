@@ -1,0 +1,62 @@
+Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)
+=======================================================================
+
+Bộ dữ liệu trong thư mục `du_lieu/` là tác phẩm phái sinh từ Wiktionary tiếng
+Việt (https://vi.wiktionary.org), vốn được cấp phép CC BY-SA 4.0. Do điều khoản
+ShareAlike, bộ dữ liệu này cũng được phát hành theo **cùng giấy phép**.
+
+The dataset in `du_lieu/` is derived from Vietnamese Wiktionary
+(https://vi.wiktionary.org), licensed under CC BY-SA 4.0. Per the ShareAlike
+term, this dataset is released under the **same license**.
+
+    Toàn văn giấy phép / Full legal text:
+    https://creativecommons.org/licenses/by-sa/4.0/legalcode
+    Bản tóm tắt dễ đọc / Human-readable summary:
+    https://creativecommons.org/licenses/by-sa/4.0/deed.vi
+
+
+BẠN ĐƯỢC PHÉP
+-------------
+  • Chia sẻ    — sao chép và phát hành lại dưới mọi định dạng
+  • Chỉnh sửa  — pha trộn, biến đổi, xây dựng dựa trên tác phẩm
+  • Dùng cho mục đích thương mại, kể cả trong ứng dụng trả phí
+
+VỚI ĐIỀU KIỆN
+-------------
+  • Ghi công (BY)        — nêu rõ nguồn Wiktionary tiếng Việt và giấy phép,
+                           kèm liên kết; nêu rõ nếu bạn có chỉnh sửa
+  • Chia sẻ tương tự (SA) — nếu bạn phát hành bản đã chỉnh sửa, phải dùng
+                           chính giấy phép này
+
+
+PHẠM VI — ĐỌC KỸ
+----------------
+Giấy phép này áp cho **dữ liệu trong `du_lieu/`**, không áp cho phần mềm đọc
+dữ liệu đó.
+
+  This license covers the DATA in `du_lieu/`. It does NOT extend to software
+  that merely reads the data. An application bundling this dataset must credit
+  the source and keep the dataset itself under CC BY-SA, but its own source
+  code is unaffected.
+
+Mã nguồn trong `cong_cu/` do Warm Jar Games viết, phát hành theo giấy phép MIT:
+
+  Copyright (c) 2026 Warm Jar Games
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in
+  all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.

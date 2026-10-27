@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Check, Copy, Crown, Link2, LogOut, RefreshCw, WifiOff } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { NicknameDialog } from "@/components/nickname-dialog";
 import { TicTacToeGame } from "@/components/tic-tac-toe";
+import { WordChainGame } from "@/components/word-chain-game";
 import { useRoom } from "@/hooks/use-room";
+import type { GameAction } from "@/modules/game/core/types";
 import { getClientIdentity, updateNickname, type ClientIdentity } from "@/modules/identity/client";
 import type { RoomSnapshot } from "@/types/domain";
 
@@ -24,6 +26,7 @@ export function RoomClient({ code }: { code: string }) {
   const me = useMemo(() => room?.players.find((player) => player.id === identity.playerId), [room, identity.playerId]);
   const isHost = Boolean(me?.isHost && room?.hostId === identity.playerId);
   const needsNickname = Boolean(room && !me);
+  const sendGameAction = useCallback((action: GameAction) => mutate("action", { action }), [mutate]);
 
   const run = async (intent: "ready" | "start" | "action" | "restart" | "leave", extras: Record<string, unknown> = {}) => {
     try {
@@ -99,7 +102,8 @@ export function RoomClient({ code }: { code: string }) {
         </div>
 
         {room.status === "WAITING" && me && <WaitingRoom room={room} identity={identity} isHost={isHost} onReady={() => void run("ready", { ready: !me.ready })} onStart={() => void run("start")} onLeave={() => void leave()} onCopy={(value, message) => void copy(value, message)} />}
-        {room.status !== "WAITING" && me && <TicTacToeGame room={room} playerId={identity.playerId} isHost={isHost} disabled={connection !== "online"} onAction={(position) => void run("action", { action: { type: "place-mark", payload: { position } } })} onRestart={() => void run("restart")} onLeave={() => void leave()} />}
+        {room.status !== "WAITING" && me && room.gameId === "tic-tac-toe" && <TicTacToeGame room={room} playerId={identity.playerId} isHost={isHost} disabled={connection !== "online"} onAction={(position) => void sendGameAction({ type: "place-mark", payload: { position } })} onRestart={() => void run("restart")} onLeave={() => void leave()} />}
+        {room.status !== "WAITING" && me && room.gameId === "word-chain" && <WordChainGame room={room} playerId={identity.playerId} isHost={isHost} disabled={connection !== "online"} onAction={sendGameAction} onRestart={() => void run("restart")} onLeave={() => void leave()} />}
 
         {displayError && <div role="alert" className="mt-6 flex items-center justify-between gap-4 rounded-xl border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm text-red-200"><span>{displayError}</span><button type="button" onClick={() => setError(null)} className="text-xs font-semibold text-red-100">Đóng</button></div>}
         {toast && <div role="status" className="fixed bottom-6 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-xl border border-mint/30 bg-panel px-4 py-2.5 text-sm font-semibold text-mint"><Check size={15} /> {toast}</div>}
@@ -121,12 +125,12 @@ function ConnectionStatus({ state }: { state: "connecting" | "online" | "offline
 
 function WaitingRoom({ room, identity, isHost, onReady, onStart, onLeave, onCopy }: { room: RoomSnapshot; identity: ClientIdentity; isHost: boolean; onReady: () => void; onStart: () => void; onLeave: () => void; onCopy: (value: string, message: string) => void }) {
   const currentPlayer = room.players.find((player) => player.id === identity.playerId);
-  const allReady = room.players.length >= 2 && room.players.every((player) => player.ready);
+  const allReady = room.players.length >= room.minPlayers && room.players.every((player) => player.ready);
   const inviteLink = typeof window === "undefined" ? "" : `${window.location.origin}/room/${room.code}`;
 
   return <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
     <div className="rounded-2xl border border-line bg-panel p-5 sm:p-7">
-      <div className="flex items-end justify-between gap-4"><div><p className="text-sm font-medium text-slate-400">Người chơi</p><h2 className="mt-1 text-2xl font-semibold text-white">{room.players.length}/2</h2></div><p className="text-right text-sm text-slate-500">{allReady ? "Mọi người đã sẵn sàng" : "Chờ đủ người"}</p></div>
+      <div className="flex items-end justify-between gap-4"><div><p className="text-sm font-medium text-slate-400">Người chơi</p><h2 className="mt-1 text-2xl font-semibold text-white">{room.players.length}/{room.maxPlayers}</h2></div><p className="text-right text-sm text-slate-500">{allReady ? "Mọi người đã sẵn sàng" : `Cần ít nhất ${room.minPlayers} người`}</p></div>
       <div className="mt-5 space-y-2">
         {room.players.map((player) => <div key={player.id} className="flex items-center justify-between gap-4 border-b border-line py-3 last:border-b-0">
           <div className="flex min-w-0 items-center gap-3"><span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-semibold ${player.id === identity.playerId ? "bg-mint text-ink" : "bg-ink text-slate-300"}`}>{player.nickname.slice(0, 1).toUpperCase()}</span><div className="min-w-0"><p className="truncate text-sm font-medium text-white">{player.nickname} {player.id === identity.playerId && <span className="font-normal text-slate-500">(bạn)</span>}</p><p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500">{player.isHost && <><Crown size={12} className="text-mint" /> Chủ phòng · </>}{player.connected ? "Đã vào" : "Đã rời"}</p></div></div>
@@ -137,7 +141,7 @@ function WaitingRoom({ room, identity, isHost, onReady, onStart, onLeave, onCopy
         <button type="button" onClick={onReady} className={`rounded-xl px-4 py-3 text-sm font-semibold transition ${currentPlayer?.ready ? "border border-mint/40 text-mint hover:bg-mint/10" : "bg-mint text-ink hover:bg-white"}`}><Check size={16} className="mr-2 inline" />{currentPlayer?.ready ? "Bỏ sẵn sàng" : "Sẵn sàng"}</button>
         {isHost ? <button type="button" onClick={onStart} disabled={!allReady} className="rounded-xl border border-line px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40">Bắt đầu</button> : <p className="flex items-center justify-center rounded-xl border border-line px-4 py-3 text-center text-xs text-slate-500">Chờ chủ phòng bắt đầu</p>}
       </div>
-      {isHost && !allReady && <p className="mt-3 text-xs text-slate-500">Cần đủ 2 người và mọi người sẵn sàng.</p>}
+      {isHost && !allReady && <p className="mt-3 text-xs text-slate-500">Cần đủ {room.minPlayers} người và mọi người sẵn sàng.</p>}
     </div>
 
     <aside className="rounded-2xl border border-line bg-panel p-5">

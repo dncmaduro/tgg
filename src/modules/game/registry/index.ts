@@ -1,6 +1,5 @@
-import { ticTacToeEngine } from "@/modules/game/implementations/tic-tac-toe/engine";
-import type { GameEngine } from "@/modules/game/core/types";
 import type { GameId } from "@/types/domain";
+import type { AnyGameEngine } from "@/modules/game/core/types";
 
 export type GameDefinition = {
   id: GameId;
@@ -10,10 +9,19 @@ export type GameDefinition = {
   minPlayers: number;
   maxPlayers: number;
   status: "available" | "coming-soon";
-  engine?: GameEngine;
+  engine?: AnyGameEngine;
 };
 
 export const gameRegistry: GameDefinition[] = [
+  {
+    id: "word-chain",
+    title: "Nối từ",
+    description: "2–10 người, mỗi lượt 15 giây.",
+    icon: "↔",
+    minPlayers: 2,
+    maxPlayers: 10,
+    status: "available",
+  },
   {
     id: "tic-tac-toe",
     title: "Caro mini",
@@ -22,7 +30,6 @@ export const gameRegistry: GameDefinition[] = [
     minPlayers: 2,
     maxPlayers: 2,
     status: "available",
-    engine: ticTacToeEngine,
   },
   {
     id: "caro",
@@ -64,10 +71,4 @@ export const gameRegistry: GameDefinition[] = [
 
 export function getGameDefinition(gameId: string): GameDefinition | undefined {
   return gameRegistry.find((game) => game.id === gameId);
-}
-
-export function getSupportedGame(gameId: string): GameDefinition & { engine: GameEngine } {
-  const game = getGameDefinition(gameId);
-  if (!game || game.status !== "available" || !game.engine) throw new Error("Trò chơi chưa được hỗ trợ.");
-  return game as GameDefinition & { engine: GameEngine };
 }
